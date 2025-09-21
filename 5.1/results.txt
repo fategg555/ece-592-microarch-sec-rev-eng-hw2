@@ -1,0 +1,37 @@
+=== CPU Feature Check (CPUID) ===
+Cache level 1 present
+Cache level 1 present
+Cache level 2 present
+Cache level 3 present
+Branch prediction: YES (all modern x86 CPUs)
+Pipelined: YES (all modern x86 CPUs)
+=================================
+
+=== Cache Latency Staircase Test ===
+Size     4096 bytes: 676 cycles
+Size    32768 bytes: 3984 cycles
+Size   262144 bytes: 26234 cycles
+Size  4194304 bytes: 719204 cycles
+Size 67108864 bytes: 15527616 cycles
+Look for jumps in latency = cache boundaries
+
+=== Branch Prediction Test ===
+Predictable branch cycles: 25760426
+Unpredictable branch cycles: 588415280
+If unpredictable >> predictable → Branch prediction confirmed
+
+=== Pipeline Test ===
+Dependent ops: 23289342 cycles
+Independent ops: 37741128 cycles
+If independent ops are faster per op → Pipeline confirmed
+
+=== Final Results ===
+Cache: Yes
+Cache Levels Detected: 4
+Branch Prediction: Yes
+Predictable branch cycles: 25760426
+Unpredictable branch cycles: 588415280
+Pipelined: No
+Dependent ops cycles: 23289342
+Independent ops cycles: 37741128
+=====================
