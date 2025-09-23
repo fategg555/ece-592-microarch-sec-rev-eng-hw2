@@ -1,0 +1,10 @@
+=== AVX2 Throughput Test ===
+Total cycles: 26
+Total ops:    80000000
+CPI: 0.0000
+IPC: 3076923.0769
+
+=== AVX2 Latency Test ===
+Total cycles (with ops): 26
+Empty loop overhead:     7447340
+Latency per op:          1844674407370.21 cycles
