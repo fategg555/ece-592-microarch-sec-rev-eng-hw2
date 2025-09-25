@@ -1,0 +1,18 @@
+=== Reorder Buffer (ROB) Estimation ===
+Chain length 16: 464 cycles
+Chain length 32: 788 cycles
+Chain length 64: 1812 cycles
+Chain length 128: 3368 cycles
+Chain length 256: 6164 cycles
+Chain length 512: 15316 cycles
+Chain length 1024: 30352 cycles
+Observe where cycles per op plateau → approximate ROB size
+
+=== Register File Pressure Test ===
+8 live registers: 18936325 cycles
+16 live registers: 33515033 cycles
+32 live registers: 62030464 cycles
+64 live registers: 137654580 cycles
+128 live registers: 257911784 cycles
+Latency jumps indicate physical register file saturation
+
