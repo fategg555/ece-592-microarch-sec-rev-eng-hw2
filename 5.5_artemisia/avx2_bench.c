@@ -42,6 +42,9 @@ int main() {
         a5 = _mm256_add_epi32(a5, a4);
         a7 = _mm256_add_epi32(a7, a6);
     }
+    // Prevent optimization: consume results
+    asm volatile("" :: "x"(a0), "x"(a1), "x"(a2), "x"(a3),
+                      "x"(a4), "x"(a5), "x"(a6), "x"(a7));
     end = rdtscp_serialized();
 
     uint64_t cycles_throughput = end - start;
@@ -60,26 +63,42 @@ int main() {
     fprintf(fp, "CPI: %.4f\nIPC: %.4f\n\n", cpi, ipc);
 
     // -----------------------------
-    // 2. AVX2 Latency (dependent chain)
+    // 2. AVX2 Latency (dependent chain, unrolled 8x)
     // -----------------------------
     __m256i b = _mm256_set1_epi32(1);
 
     start = rdtscp_serialized();
     for (int i = 0; i < N; i++) {
-        b = _mm256_add_epi32(b, b); // dependent chain
+        // Unrolled 8 times
+        b = _mm256_add_epi32(b, b);
+        b = _mm256_add_epi32(b, b);
+        b = _mm256_add_epi32(b, b);
+        b = _mm256_add_epi32(b, b);
+        b = _mm256_add_epi32(b, b);
+        b = _mm256_add_epi32(b, b);
+        b = _mm256_add_epi32(b, b);
+        b = _mm256_add_epi32(b, b);
     }
+    asm volatile("" :: "x"(b)); // prevent optimization
     end = rdtscp_serialized();
     uint64_t cycles_latency = end - start;
 
-    // Empty loop overhead
+    // Empty loop overhead (also unrolled 8x for fairness)
     start = rdtscp_serialized();
     for (int i = 0; i < N; i++) {
+        asm volatile("" ::: "memory");
+        asm volatile("" ::: "memory");
+        asm volatile("" ::: "memory");
+        asm volatile("" ::: "memory");
+        asm volatile("" ::: "memory");
+        asm volatile("" ::: "memory");
+        asm volatile("" ::: "memory");
         asm volatile("" ::: "memory");
     }
     end = rdtscp_serialized();
     uint64_t cycles_overhead = end - start;
 
-    double latency = (double)(cycles_latency - cycles_overhead) / N;
+    double latency = (double)(cycles_latency - cycles_overhead) / (N * 8);
 
     printf("=== AVX2 Latency Test ===\n");
     printf("Total cycles (with ops): %llu\n", (unsigned long long)cycles_latency);
@@ -90,6 +109,7 @@ int main() {
     fprintf(fp, "Total cycles (with ops): %llu\n", (unsigned long long)cycles_latency);
     fprintf(fp, "Empty loop overhead:     %llu\n", (unsigned long long)cycles_overhead);
     fprintf(fp, "Latency per op:          %.2f cycles\n", latency);
+
 
     fclose(fp);
     return 0;
