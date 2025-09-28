@@ -7,7 +7,7 @@
 FILE *log_fp;
 
 // ------------------ Branch Array Helper ------------------
-#define MAX_BRANCHES 1024
+#define MAX_BRANCHES 16384
 
 typedef void (*branch_fn_t)(void);
 typedef void (*empty_fn_t)(uint64_t);
@@ -54,7 +54,7 @@ void btb_cap_test()
     // Pointer-chase through branch functions to stress BTB
     unsigned int temp;
     unsigned int total = 0;
-    int N = 100;
+    int N = 1000000;
     for (int num_branches = 4; num_branches <= MAX_BRANCHES; num_branches *= 2) {
         uint64_t start = __rdtscp(&temp);
         for (int repeat = 0; repeat < N; repeat++) {
