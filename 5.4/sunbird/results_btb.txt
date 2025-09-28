@@ -1,0 +1,10 @@
+=== better btb Capacity Test ===
+Using 4 branch targets → total cycles = 88
+Using 8 branch targets → total cycles = 119
+Using 16 branch targets → total cycles = 204
+Using 32 branch targets → total cycles = 373
+Using 64 branch targets → total cycles = 746
+Using 128 branch targets → total cycles = 1416
+Using 256 branch targets → total cycles = 2764
+Using 512 branch targets → total cycles = 5827
+Using 1024 branch targets → total cycles = 10021

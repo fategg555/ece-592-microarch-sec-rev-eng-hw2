@@ -1,0 +1,10 @@
+=== Superscalar Dimensions ===
+Max instructions per cycle (approx) = 0.79
+Dependent chain length 16 → avg cycles/op = 9.88
+Dependent chain length 32 → avg cycles/op = 6.88
+Dependent chain length 64 → avg cycles/op = 6.58
+Dependent chain length 128 → avg cycles/op = 7.30
+Dependent chain length 256 → avg cycles/op = 7.68
+Dependent chain length 512 → avg cycles/op = 7.80
+Observe latency per op → pipeline depth estimate
+
