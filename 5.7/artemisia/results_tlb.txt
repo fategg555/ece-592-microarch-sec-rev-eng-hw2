@@ -1,5 +1,4 @@
-=== TLB Microbenchmark ===
-4 KiB pages: avg TLB cycles/access = 0
-2 MiB pages: avg TLB cycles/access = 0
-Compare → smaller pages stress L1/L2 TLB; large pages reduce TLB misses
-
+=== TLB Microbenchmark (debug) ===
+iterations=2000000
+4 KiB pages (16384 pages): avg cycles/access = 296
+2 MiB pages (512 pages): avg cycles/access = 278
