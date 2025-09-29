@@ -1,11 +1,19 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <immintrin.h>
+#include <x86intrin.h>
 
 #define N 10000000
 
 int arr[N];
-int temp;
+unsigned int temp;  // for rdtscp
+
+static inline unsigned long long rdtscp_serialized() {
+    unsigned lo, hi, aux;
+    __asm__ __volatile__("rdtscp" : "=a"(lo), "=d"(hi), "=c"(aux) :: "memory");
+    return ((unsigned long long)hi << 32) | lo;
+}
 
 void streaming_access() {
     for (int i = 0; i < N; i++) {
@@ -21,13 +29,23 @@ void randomized_access() {
 }
 
 int main() {
-    int begin = __rdtscp(&temp);
+    FILE *fp = fopen("results.txt", "w");
+    if (!fp) {
+        perror("fopen");
+        return 1;
+    }
+
+    unsigned long long begin = rdtscp_serialized();
     streaming_access();
-    int finish = __rdtscp(&temp);
-    int begin_random = __rdtscp(&temp);
+    unsigned long long finish = rdtscp_serialized();
+
+    unsigned long long begin_random = rdtscp_serialized();
     randomized_access();
-    int finish_random = __rdtscp(&temp);
-    printf("Streaming access time: %d cycles\n", (finish-begin)); 
-    printf("Randomized access time: %d cycles\n", (finish_random - begin_random));
+    unsigned long long finish_random = rdtscp_serialized();
+
+    fprintf(fp, "Streaming access time: %llu cycles\n", (finish - begin));
+    fprintf(fp, "Randomized access time: %llu cycles\n", (finish_random - begin_random));
+
+    fclose(fp);
     return 0;
 }

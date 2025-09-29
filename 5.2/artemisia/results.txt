@@ -1,2 +1,2 @@
-Streaming access time: 163957513 cycles
-Randomized access time: 1016343096 cycles
+Streaming access time: 77151062 cycles
+Randomized access time: 1541766674 cycles
