@@ -57,6 +57,8 @@ uint64_t tlb_test(size_t num_pages, size_t page_size, size_t iterations) {
         pages[i] = p;
     }
 
+  
+
     /* write the pointer-chase: store pointer to next page at start of each page */
     for (size_t i = 0; i < num_pages; ++i) {
         size_t next = (i + 1) % num_pages;
