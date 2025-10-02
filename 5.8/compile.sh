@@ -1,0 +1,1 @@
+gcc -O2 -fno-tree-vectorize -march=native -std=c11 -Wall -o rob_bench rob_bench.c 
