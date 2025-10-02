@@ -1,0 +1,27 @@
+=== Cache Hierarchy ===
+L1 cache: 32 KB, line size=64 B, 8-way, 64 sets
+L1 cache: 32 KB, line size=64 B, 8-way, 64 sets
+L2 cache: 256 KB, line size=64 B, 8-way, 512 sets
+L3 cache: 30720 KB, line size=64 B, 20-way, 24576 sets
+
+=== Cache Line Size Test ===
+Stride   1: 4094550 cycles
+Stride   2: 1116196 cycles
+Stride   4: 515155 cycles
+Stride   8: 303955 cycles
+Stride  16: 217695 cycles
+Stride  32: 199305 cycles
+Stride  64: 215010 cycles
+Stride 128: 107910 cycles
+Expect a jump at the cache line size.
+
+=== L1 and L2 Miss Latency Test ===
+L1 Hit latency: 50 cycles
+L1 Miss (~L2 hit) latency: 210 cycles
+L2 Miss (~LLC hit) latency: 95 cycles
+
+=== LLC Inclusivity Test ===
+Before eviction: 35 cycles
+After eviction:  230 cycles
+→ Likely Inclusive LLC (line evicted from L1)
+

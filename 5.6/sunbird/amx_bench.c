@@ -1,80 +1,131 @@
+#define _GNU_SOURCE
 #include <stdio.h>
+#include <stdlib.h>
 #include <stdint.h>
-#include <immintrin.h>
-#include <x86intrin.h>
 #include <string.h>
+#include <immintrin.h>    // AMX intrinsics
+#include <x86intrin.h>    // __rdtscp
+#include <pthread.h>
+#include <sched.h>
 
-// Timing
-static inline uint64_t rdtscp_serialized(void) {
-    unsigned lo, hi, aux;
-    __asm__ __volatile__("rdtscp" : "=a"(lo), "=d"(hi), "=c"(aux) :: "memory");
-    return ((uint64_t)hi << 32) | lo;
+#define REPETITIONS 1000
+
+typedef struct {
+    uint8_t   palette_id;
+    uint8_t   start_row;
+    uint8_t   reserved_0[14];
+    uint16_t  colsb[16];
+    uint8_t   rows[16];
+} __tilecfg;
+
+static void pin_thread_to_core(int core_id) {
+    cpu_set_t cs;
+    CPU_ZERO(&cs);
+    CPU_SET(core_id, &cs);
+    pthread_setaffinity_np(pthread_self(), sizeof(cs), &cs);
 }
 
-#define TILE_M 16
-#define TILE_N 16
-#define TILE_K 16
+static void fill_int8(int8_t *B, int R, int C, float zf) {
+    for(int i=0;i<R*C;i++)
+        B[i] = ((rand()/(float)RAND_MAX) < zf) ? 0 : (rand()%127+1);
+}
 
-int main() {
-    // Tile configuration
-    struct {
-        uint16_t palette_id;
-        uint16_t reserved;
-        uint32_t colsb[8];
-        uint16_t rows[8];
-    } __attribute__((packed, aligned(64))) cfg;
-
-    memset(&cfg, 0, sizeof(cfg));
-    cfg.palette_id = 1; // AMX BF16 palette
-    cfg.colsb[0] = TILE_K * 2; // bytes per row (BF16 = 2 bytes)
-    cfg.rows[0] = TILE_M;
-    cfg.colsb[1] = TILE_N * 4; // result (FP32)
-    cfg.rows[1] = TILE_M;
-
-    __tile_loadconfig(&cfg);
-
-    // Allocate matrices
-    uint16_t A[TILE_M][TILE_K]; // BF16 (16-bit)
-    uint16_t B[TILE_K][TILE_N];
-    float C[TILE_M][TILE_N];
-
-    // Example: vary sparsity
-    float sparsity_levels[] = {0.0, 0.25, 0.5, 0.75, 1.0};
-    for (int s = 0; s < 5; s++) {
-        float sparsity = sparsity_levels[s];
-
-        // Fill A and B with controlled sparsity
-        for (int i = 0; i < TILE_M; i++) {
-            for (int j = 0; j < TILE_K; j++) {
-                A[i][j] = ((float)rand()/RAND_MAX < sparsity) ? 0 : 0x3f80; // BF16 for 1.0
-            }
+static void fill_bf16(uint16_t *B, int R, int C, float zf) {
+    for(int i=0;i<R*C;i++){
+        if((rand()/(float)RAND_MAX) < zf){
+            B[i]=0;
+        } else {
+            float v = (rand()/(float)RAND_MAX)*2.0f-1.0f;
+            uint32_t bits;
+            memcpy(&bits,&v,sizeof bits);
+            B[i] = (uint16_t)(bits>>16);
         }
-        for (int i = 0; i < TILE_K; i++) {
-            for (int j = 0; j < TILE_N; j++) {
-                B[i][j] = ((float)rand()/RAND_MAX < sparsity) ? 0 : 0x3f80;
-            }
-        }
+    }
+}
 
-        memset(C, 0, sizeof(C));
+static uint64_t measure_int8(int M,int N,int K,float zf){
+    int8_t  *A=aligned_alloc(64,M*K);
+    int8_t  *B=aligned_alloc(64,K*N);
+    int32_t *C=aligned_alloc(64,M*N*sizeof(int32_t));
+    fill_int8(A,M,K,zf);
+    fill_int8(B,K,N,zf);
+    memset(C,0,M*N*sizeof(int32_t));
 
-        // Load tiles
-        __tile_loadd(0, A, TILE_K * 2);   // A
-        __tile_loadd(1, B, TILE_N * 2);   // B
-        __tile_loadd(2, C, TILE_N * 4);   // C
+    __tilecfg cfg={0};
+    cfg.palette_id=1; cfg.start_row=0;
+    cfg.rows[0]=M; cfg.colsb[0]=K*sizeof(int8_t);
+    cfg.rows[1]=K; cfg.colsb[1]=N*sizeof(int8_t);
+    cfg.rows[2]=M; cfg.colsb[2]=N*sizeof(int32_t);
+    _tile_loadconfig(&cfg);
 
-        uint64_t start = rdtscp_serialized();
+    uint64_t sum=0; unsigned int aux;
+    for(int i=0;i<REPETITIONS;i++){
+        uint64_t s=__rdtscp(&aux);
+        _tile_zero(2);
+        _tile_loadd(0,A,K*sizeof(int8_t));
+        _tile_loadd(1,B,N*sizeof(int8_t));
+        _tile_dpbssd(2,0,1);
+        _tile_stored(2,C,N*sizeof(int32_t));
+        uint64_t e=__rdtscp(&aux);
+        sum += e-s;
+    }
+    _tile_release();
+    free(A); free(B); free(C);
+    return sum/REPETITIONS;
+}
 
-        // Run TMUL
-        __tile_dpbf16ps(2, 0, 1);
+static uint64_t measure_bf16(int M,int N,int K,float zf){
+    uint16_t *A=aligned_alloc(64,M*K*sizeof(uint16_t));
+    uint16_t *B=aligned_alloc(64,K*N*sizeof(uint16_t));
+    float    *C=aligned_alloc(64,M*N*sizeof(float));
+    fill_bf16(A,M,K,zf);
+    fill_bf16(B,K,N,zf);
+    memset(C,0,M*N*sizeof(float));
 
-        uint64_t end = rdtscp_serialized();
+    __tilecfg cfg={0};
+    cfg.palette_id=1; cfg.start_row=0;
+    cfg.rows[0]=M; cfg.colsb[0]=K*sizeof(uint16_t);
+    cfg.rows[1]=K; cfg.colsb[1]=N*sizeof(uint16_t);
+    cfg.rows[2]=M; cfg.colsb[2]=N*sizeof(float);
+    _tile_loadconfig(&cfg);
 
-        printf("Sparsity %.2f → %llu cycles\n", sparsity, (unsigned long long)(end - start));
+    uint64_t sum=0; unsigned int aux;
+    for(int i=0;i<REPETITIONS;i++){
+        uint64_t s=__rdtscp(&aux);
+        _tile_zero(2);
+        _tile_loadd(0,A,K*sizeof(uint16_t));
+        _tile_loadd(1,B,N*sizeof(uint16_t));
+        _tile_dpbf16ps(2,0,1);
+        _tile_stored(2,C,N*sizeof(float));
+        uint64_t e=__rdtscp(&aux);
+        sum += e-s;
+    }
+    _tile_release();
+    free(A); free(B); free(C);
+    return sum/REPETITIONS;
+}
 
-        // Store result back if needed
-        __tile_stored(C, 2, TILE_N * 4);
+int main(int argc, char **argv) {
+    if(argc!=6){
+        fprintf(stderr,"Usage: %s <INT8|BF16> M N K zero_frac\n",argv[0]);
+        return 1;
+    }
+    char *type=argv[1];
+    int M=atoi(argv[2]), N=atoi(argv[3]), K=atoi(argv[4]);
+    float zf=strtof(argv[5],NULL);
+
+    pin_thread_to_core(0);
+    uint64_t cycles=0;
+
+    if(strcmp(type,"INT8")==0){
+        cycles = measure_int8(M,N,K,zf);
+    } else if(strcmp(type,"BF16")==0){
+        cycles = measure_bf16(M,N,K,zf);
+    } else {
+        fprintf(stderr,"Unknown type '%s'\n",type);
+        return 1;
     }
 
-    __tile_release(); // free resources
+    printf("%lu\n",(unsigned long)cycles);
     return 0;
 }

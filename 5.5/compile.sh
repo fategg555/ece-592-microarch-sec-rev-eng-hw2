@@ -1,0 +1,1 @@
+gcc -O2 -fno-tree-vectorize -march=native -std=c11 -Wall -o avx2 avx2_bench.c

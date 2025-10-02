@@ -20,7 +20,7 @@ void *rob_stress(void *arg) {
         for (int i = 0; i < 1000000; i++) {
             x = _mm256_add_epi32(x, x); // dependency chain
         }
-        asm volatile("" :: "x"(x));
+        __asm__ volatile("" :: "x"(x));
     }
     return NULL;
 }
@@ -60,7 +60,7 @@ void *measure(void *arg) {
             for (int i = 0; i < 10000000; i++) {
                 x = _mm256_add_epi32(x, x);
             }
-            asm volatile("" :: "x"(x));
+            __asm__ volatile("" :: "x"(x));
         } else {
             volatile int sum = 0;
             for (int i = 0; i < 10000000; i++) {

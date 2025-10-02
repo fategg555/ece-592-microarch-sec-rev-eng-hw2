@@ -1,0 +1,1 @@
+gcc -O2 -fno-tree-vectorize -march=native -std=c11 -Wall -o super_scalar super_scalar_bench.c

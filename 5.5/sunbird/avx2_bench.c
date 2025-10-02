@@ -43,8 +43,8 @@ int main() {
         a7 = _mm256_add_epi32(a7, a6);
     }
     // Prevent optimization: consume results
-    asm volatile("" :: "x"(a0), "x"(a1), "x"(a2), "x"(a3),
-                      "x"(a4), "x"(a5), "x"(a6), "x"(a7));
+    __asm__ volatile("" :: "x"(a0), "x"(a1), "x"(a2), "x"(a3),
+                          "x"(a4), "x"(a5), "x"(a6), "x"(a7));
     end = rdtscp_serialized();
 
     uint64_t cycles_throughput = end - start;
@@ -78,21 +78,21 @@ int main() {
         b = _mm256_add_epi32(b, b);
         b = _mm256_add_epi32(b, b);
     }
-    asm volatile("" :: "x"(b)); // prevent optimization
+    __asm__ volatile("" :: "x"(b)); // prevent optimization
     end = rdtscp_serialized();
     uint64_t cycles_latency = end - start;
 
     // Empty loop overhead (8 barriers per iteration)
     start = rdtscp_serialized();
     for (int i = 0; i < N; i++) {
-        asm volatile("" ::: "memory");
-        asm volatile("" ::: "memory");
-        asm volatile("" ::: "memory");
-        asm volatile("" ::: "memory");
-        asm volatile("" ::: "memory");
-        asm volatile("" ::: "memory");
-        asm volatile("" ::: "memory");
-        asm volatile("" ::: "memory");
+        __asm__ volatile("" ::: "memory");
+        __asm__ volatile("" ::: "memory");
+        __asm__ volatile("" ::: "memory");
+        __asm__ volatile("" ::: "memory");
+        __asm__ volatile("" ::: "memory");
+        __asm__ volatile("" ::: "memory");
+        __asm__ volatile("" ::: "memory");
+        __asm__ volatile("" ::: "memory");
     }
     end = rdtscp_serialized();
     uint64_t cycles_overhead = end - start;
