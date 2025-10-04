@@ -1,27 +1,60 @@
-=== Cache Hierarchy ===
-L1 cache: 48 KB, line size=64 B, 12-way, 64 sets
-L1 cache: 32 KB, line size=64 B, 8-way, 64 sets
-L2 cache: 2048 KB, line size=64 B, 16-way, 2048 sets
-L3 cache: 53760 KB, line size=64 B, 15-way, 57344 sets
+=== Cache Hierarchy (CPUID) ===
+L1 cache: 48 KB, line=64 B, 12-way, 64 sets
+L1 cache: 32 KB, line=64 B, 8-way, 64 sets
+L2 cache: 2048 KB, line=64 B, 16-way, 2048 sets
+L3 cache: 53760 KB, line=64 B, 15-way, 57344 sets
 
-=== Cache Line Size Test ===
-Stride   1: 7369506 cycles
-Stride   2: 2932378 cycles
-Stride   4: 1397868 cycles
-Stride   8: 691522 cycles
-Stride  16: 350420 cycles
-Stride  32: 183684 cycles
-Stride  64: 89408 cycles
-Stride 128: 47804 cycles
-Expect a jump at the cache line size.
+NOTE: For reproducible results: pin the process (done), set CPU governor to performance, disable Turbo if possible.
+Compile with: -O2 -fno-tree-vectorize -march=native
 
-=== L1 and L2 Miss Latency Test ===
-L1 Hit latency: 32 cycles
-L1 Miss (~L2 hit) latency: 298 cycles
-L2 Miss (~LLC hit) latency: 240 cycles
-
-=== LLC Inclusivity Test ===
-Before eviction: 32 cycles
-After eviction:  248 cycles
-→ Likely Inclusive LLC (line evicted from L1)
-
+size(bytes),stride(bytes),seq_cycles_per_access,prefetch_effect_ratio,chase_cycles_per_access,inflection
+4096,4,14.351,0.427,33.595,NO
+4096,16,14.349,0.429,33.474,NO
+4096,64,14.345,0.429,33.444,NO
+4096,128,14.355,0.429,33.449,NO
+4096,256,14.349,0.430,33.396,NO
+16384,4,14.358,0.410,35.029,NO
+16384,16,14.342,0.403,35.606,NO
+16384,64,14.349,0.412,34.869,NO
+16384,128,14.348,0.424,33.855,NO
+16384,256,14.351,0.428,33.493,NO
+32768,4,14.354,0.405,35.414,NO
+32768,16,14.359,0.384,37.359,NO
+32768,64,14.367,0.320,44.937,NO
+32768,128,14.360,0.352,40.813,NO
+32768,256,14.353,0.390,36.801,NO
+65536,4,14.354,0.404,35.540,NO
+65536,16,14.368,0.382,37.598,NO
+65536,64,14.358,0.286,50.155,NO
+65536,128,14.369,0.286,50.194,NO
+65536,256,14.366,0.285,50.382,NO
+262144,4,14.346,0.404,35.536,NO
+262144,16,14.361,0.381,37.694,NO
+262144,64,14.364,0.282,50.910,NO
+262144,128,14.362,0.280,51.332,NO
+262144,256,14.364,0.278,51.588,NO
+524288,4,14.357,0.392,36.614,NO
+524288,16,14.357,0.379,37.833,NO
+524288,64,14.361,0.281,51.184,NO
+524288,128,14.365,0.279,51.450,NO
+524288,256,14.366,0.278,51.759,NO
+1048576,4,14.354,0.338,42.458,NO
+1048576,16,14.362,0.339,42.368,NO
+1048576,64,14.368,0.275,52.297,NO
+1048576,128,14.362,0.278,51.739,NO
+1048576,256,14.362,0.277,51.841,NO
+4194304,4,14.353,0.254,56.484,NO
+4194304,16,14.350,0.183,78.323,NO
+4194304,64,14.366,0.072,199.990,YES
+4194304,128,14.800,0.122,120.896,NO
+4194304,256,15.660,0.144,108.738,NO
+16777216,4,14.357,0.216,66.535,NO
+16777216,16,14.353,0.145,99.101,NO
+16777216,64,14.371,0.049,296.000,YES
+16777216,128,14.712,0.050,292.902,NO
+16777216,256,15.924,0.058,273.606,NO
+67108864,4,14.357,0.215,66.894,NO
+67108864,16,14.346,0.145,99.078,NO
+67108864,64,14.387,0.048,296.701,YES
+67108864,128,14.893,0.049,301.163,NO
+67108864,256,16.467,0.055,300.286,NO
