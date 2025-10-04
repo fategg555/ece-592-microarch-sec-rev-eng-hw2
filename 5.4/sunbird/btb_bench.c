@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include <time.h>
+#include <inttypes.h>
 #include <x86intrin.h>
 
 FILE *log_fp;
@@ -10,12 +10,42 @@ FILE *log_fp;
 #define MAX_BRANCHES 16384
 
 typedef void (*branch_fn_t)(void);
-typedef void (*empty_fn_t)(uint64_t);
+typedef void (*empty_fn_t)(void);
 
 // Simple branch function that does nothing
 void branch_stub() {}
 
 void empty(uint64_t p){}; // empty function which enforces parameter passing
+
+
+void btb_cap_test() 
+{
+    fprintf(log_fp, "=== better btb Capacity Test ===\n");
+    empty_fn_t *branches = malloc(MAX_BRANCHES * sizeof(empty_fn_t));
+    for (int i = 0; i < MAX_BRANCHES; i++) branches[i] = branch_stub;
+
+    // Pointer-chase through branch functions to stress BTB
+    unsigned int temp;
+    unsigned int total = 0;
+    int N = 10000;
+    for (int num_branches = 256; num_branches <= MAX_BRANCHES; num_branches += 256) {
+       // train predictor, store targets in BTB
+        // call targets in BTB
+        uint64_t start = __rdtscp(&temp);
+        for (int i = 0; i < num_branches; i++) {
+            if (&branches[i]) {
+                branches[i]();
+            }
+        }
+        uint64_t end = __rdtscp(&temp);
+        total = (end - start);
+        total /= num_branches;
+
+        printf("%d, %u\n",num_branches, total);
+        
+        
+    }
+}
 
 // ------------------ BTB Capacity Test ------------------
 void btb_capacity_test() {
@@ -27,7 +57,7 @@ void btb_capacity_test() {
     // Pointer-chase through branch functions to stress BTB
     volatile int dummy = 0;
     unsigned int temp;
-    for (int num_branches = 4; num_branches <= MAX_BRANCHES; num_branches *= 2) {
+    for (int num_branches = 256; num_branches <= MAX_BRANCHES; num_branches += 256) {
         uint64_t start = __rdtscp(&temp);
         for (int repeat = 0; repeat < 100000; repeat++) {
             for (int i = 0; i < num_branches; i++) {
@@ -42,33 +72,6 @@ void btb_capacity_test() {
 
     free(branches);
     fprintf(log_fp, "Observe when latency increases → approximate BTB capacity\n\n");
-}
-
-
-void btb_cap_test() 
-{
-    fprintf(log_fp, "=== better btb Capacity Test ===\n");
-    empty_fn_t *branches = malloc(MAX_BRANCHES * sizeof(empty_fn_t));
-    for (int i = 0; i < MAX_BRANCHES; i++) branches[i] = branch_stub;
-
-    // Pointer-chase through branch functions to stress BTB
-    unsigned int temp;
-    unsigned int total = 0;
-    int N = 1000000;
-    for (int num_branches = 4; num_branches <= MAX_BRANCHES; num_branches *= 2) {
-        uint64_t start = __rdtscp(&temp);
-        for (int repeat = 0; repeat < N; repeat++) {
-            uint64_t start = __rdtscp(&temp);
-            for (int i = 0; i < num_branches; i++) {
-                branches[i](temp); // call branch
-            }
-            uint64_t end = __rdtscp(&temp);
-            total += (end-start);
-        }
-        total /= N;
-        fprintf(log_fp, "Using %d branch targets → total cycles = %u\n",
-                num_branches, total);
-    }
 }
 
 // ------------------ BTB Associativity Test ------------------
@@ -130,12 +133,12 @@ int main() {
     }
 
     // btb_capacity_test();
-    // btb_associativity_test();
-    // btb_tag_bits_test();
+    btb_associativity_test();
+    btb_tag_bits_test();
     btb_cap_test();
 
     fclose(log_fp);
-    printf("BTB results written to results_btb.txt\n");
+    // printf("BTB results written to results_btb.txt\n");
     return 0;
 }
 

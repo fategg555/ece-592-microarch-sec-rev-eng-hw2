@@ -1,14 +1,28 @@
+=== BTB Associativity Test ===
+Stride 1 → total cycles = 54338515
+Stride 2 → total cycles = 22647579
+Stride 4 → total cycles = 10751819
+Stride 8 → total cycles = 5227468
+Stride 16 → total cycles = 2604052
+Observe latency jumps → estimate BTB associativity
+
+=== BTB Tag Bits Test ===
+Offset 0 → total cycles = 10449221
+Offset 1 → total cycles = 10316888
+Offset 2 → total cycles = 9862809
+Offset 3 → total cycles = 9841668
+Offset 4 → total cycles = 9856692
+Offset 5 → total cycles = 9850176
+Offset 6 → total cycles = 9846156
+Offset 7 → total cycles = 9848336
+Offset 8 → total cycles = 9853944
+Offset 9 → total cycles = 9852416
+Offset 10 → total cycles = 9838916
+Offset 11 → total cycles = 9852012
+Offset 12 → total cycles = 9851088
+Offset 13 → total cycles = 9846932
+Offset 14 → total cycles = 9876036
+Offset 15 → total cycles = 9838692
+Analyze which offsets affect latency → determine BTB tag bits
+
 === better btb Capacity Test ===
-Using 4 branch targets → total cycles = 53
-Using 8 branch targets → total cycles = 54
-Using 16 branch targets → total cycles = 101
-Using 32 branch targets → total cycles = 218
-Using 64 branch targets → total cycles = 405
-Using 128 branch targets → total cycles = 792
-Using 256 branch targets → total cycles = 1567
-Using 512 branch targets → total cycles = 3115
-Using 1024 branch targets → total cycles = 1925
-Using 2048 branch targets → total cycles = 3782
-Using 4096 branch targets → total cycles = 3316
-Using 8192 branch targets → total cycles = 2309
-Using 16384 branch targets → total cycles = 317
