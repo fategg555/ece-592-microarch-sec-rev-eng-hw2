@@ -1,10 +1,11 @@
 #include <stdio.h>
 #include <stdint.h>
-#include <stdlib.h>
 #include <stdbool.h>
 #include <x86intrin.h>
-#define JMP_LABEL(x) "jmp label_" #x "\n\t" "nop\n\t" "nop\n\t" "label_"#x": "
+#define NOP "nop\n\t"
 #define JMP(x) "jmp label_" #x "\n\t"
+#define JMP_LABEL(x) JMP(x) "\n\t" <nop> "label_"#x": "
+
 
 unsigned int aux;
 
