@@ -13,7 +13,7 @@
 #define TILE_N 16
 #define TILE_K 16
 #define TRIALS 10
-#define NITER 200   // repeat to amplify cycles
+#define NITER 200   //repeat to amplify cycles
 
 // ---------------- timing helper ----------------
 static inline uint64_t rdtscp_serialized(void) {
