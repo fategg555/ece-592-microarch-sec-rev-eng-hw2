@@ -1,112 +1,147 @@
 #define _GNU_SOURCE
 #include <stdio.h>
-#include <stdint.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
-#include <sched.h>
-#include <time.h>
 #include <immintrin.h>
 #include <x86intrin.h>
 #include <pthread.h>
+#include <sched.h>
 
-#define TILE_M 16
-#define TILE_N 16
-#define TILE_K 16
-#define TRIALS 10
-#define NITER 200   //repeat to amplify cycles
+#define REPETITIONS 1000
 
-// ---------------- timing helper ----------------
-static inline uint64_t rdtscp_serialized(void) {
-    unsigned lo, hi, aux;
-    __asm__ __volatile__("rdtscp" : "=a"(lo), "=d"(hi), "=c"(aux) :: "memory");
-    return ((uint64_t)hi << 32) | lo;
+typedef struct {
+    uint8_t   palette_id;
+    uint8_t   start_row;
+    uint8_t   reserved_0[14];
+    uint16_t  colsb[16];
+    uint8_t   rows[16];
+} __tilecfg;
+
+// ------------------------
+// Helpers
+// ------------------------
+static void pin_thread_to_core(int core_id) {
+    cpu_set_t cs;
+    CPU_ZERO(&cs);
+    CPU_SET(core_id, &cs);
+    pthread_setaffinity_np(pthread_self(), sizeof(cs), &cs);
 }
 
-// ---------------- pin thread ----------------
-static void pin_thread(int core_id) {
-    cpu_set_t cpuset;
-    CPU_ZERO(&cpuset);
-    CPU_SET(core_id, &cpuset);
-    sched_setaffinity(0, sizeof(cpu_set_t), &cpuset);
+static void fill_int8(int8_t *B, int R, int C, float zf) {
+    for(int i=0;i<R*C;i++)
+        B[i] = ((rand()/(float)RAND_MAX) < zf) ? 0 : (rand()%127+1);
 }
 
-// ---------------- median ----------------
-static uint64_t median(uint64_t *v, int n) {
-    for (int i = 0; i < n - 1; i++)
-        for (int j = i + 1; j < n; j++)
-            if (v[j] < v[i]) {
-                uint64_t t = v[i];
-                v[i] = v[j];
-                v[j] = t;
-            }
-    return v[n / 2];
-}
-
-int main() {
-    pin_thread(0);
-    srand(time(NULL));
-
-    FILE *fp = fopen("amx_sparsity_results.csv", "w");
-    if (!fp) { perror("fopen"); return 1; }
-    fprintf(fp, "sparsity,trial,cycles\n");
-
-    // allocate matrices
-    float (*A)[TILE_K] = aligned_alloc(64, sizeof(float) * TILE_M * TILE_K);
-    float (*B)[TILE_N] = aligned_alloc(64, sizeof(float) * TILE_K * TILE_N);
-    float (*C)[TILE_N] = aligned_alloc(64, sizeof(float) * TILE_M * TILE_N);
-
-    printf("⚠️ AMX not available — using software emulation of TMUL.\n");
-    printf("Running %d trials per sparsity level...\n\n", TRIALS);
-
-    float sparsity_levels[] = {0.0, 0.25, 0.5, 0.75, 1.0};
-    for (int s = 0; s < 5; s++) {
-        float sp = sparsity_levels[s];
-        uint64_t times[TRIALS];
-
-        for (int t = 0; t < TRIALS; t++) {
-            // fill A, B with zeros based on sparsity
-            for (int i = 0; i < TILE_M; i++)
-                for (int j = 0; j < TILE_K; j++)
-                    A[i][j] = ((float)rand() / RAND_MAX < sp) ? 0.0f : 1.0f;
-            for (int i = 0; i < TILE_K; i++)
-                for (int j = 0; j < TILE_N; j++)
-                    B[i][j] = ((float)rand() / RAND_MAX < sp) ? 0.0f : 1.0f;
-            memset(C, 0, sizeof(float) * TILE_M * TILE_N);
-
-            _mm_mfence();
-            uint64_t start = rdtscp_serialized();
-
-            // software “TMUL” loop (repeat NITER times)
-            for (int rep = 0; rep < NITER; rep++) {
-                for (int i = 0; i < TILE_M; i++) {
-                    for (int j = 0; j < TILE_N; j++) {
-                        float sum = 0.0f;
-                        for (int k = 0; k < TILE_K; k++) {
-                            sum += A[i][k] * B[k][j];
-                        }
-                        C[i][j] += sum;
-                    }
-                }
-            }
-
-            _mm_mfence();
-            uint64_t end = rdtscp_serialized();
-
-            uint64_t delta = end - start;
-            times[t] = delta;
-            fprintf(fp, "%.2f,%d,%llu\n", sp, t, (unsigned long long)delta);
+static void fill_bf16(uint16_t *B, int R, int C, float zf) {
+    for(int i=0;i<R*C;i++){
+        if((rand()/(float)RAND_MAX) < zf){
+            B[i]=0;
+        } else {
+            float v = (rand()/(float)RAND_MAX)*2.0f-1.0f;
+            uint32_t bits;
+            memcpy(&bits,&v,sizeof bits);
+            B[i] = (uint16_t)(bits>>16);
         }
+    }
+}
 
-        uint64_t med = median(times, TRIALS);
-        double avg = 0;
-        for (int i = 0; i < TRIALS; i++) avg += times[i];
-        avg /= TRIALS;
-        printf("Sparsity %.2f → median %llu cycles (avg %.1f)\n",
-               sp, (unsigned long long)med, avg);
+// ------------------------
+// Measure functions
+// ------------------------
+static uint64_t measure_int8(int M,int N,int K,float zf){
+    int8_t  *A=aligned_alloc(64,M*K);
+    int8_t  *B=aligned_alloc(64,K*N);
+    int32_t *C=aligned_alloc(64,M*N*sizeof(int32_t));
+    fill_int8(A,M,K,zf);
+    fill_int8(B,K,N,zf);
+    memset(C,0,M*N*sizeof(int32_t));
+
+    __tilecfg cfg={0};
+    cfg.palette_id=1; cfg.start_row=0;
+    cfg.rows[0]=M; cfg.colsb[0]=K*sizeof(int8_t);
+    cfg.rows[1]=K; cfg.colsb[1]=N*sizeof(int8_t);
+    cfg.rows[2]=M; cfg.colsb[2]=N*sizeof(int32_t);
+    _tile_loadconfig(&cfg);
+
+    uint64_t sum=0; unsigned int aux;
+    for(int i=0;i<REPETITIONS;i++){
+        uint64_t s=__rdtscp(&aux);
+        _tile_zero(2);
+        _tile_loadd(0,A,K*sizeof(int8_t));
+        _tile_loadd(1,B,N*sizeof(int8_t));
+        _tile_dpbssd(2,0,1);
+        _tile_stored(2,C,N*sizeof(int32_t));
+        uint64_t e=__rdtscp(&aux);
+        sum += e-s;
+    }
+    _tile_release();
+    free(A); free(B); free(C);
+    return sum/REPETITIONS;
+}
+
+static uint64_t measure_bf16(int M,int N,int K,float zf){
+    uint16_t *A=aligned_alloc(64,M*K*sizeof(uint16_t));
+    uint16_t *B=aligned_alloc(64,K*N*sizeof(uint16_t));
+    float    *C=aligned_alloc(64,M*N*sizeof(float));
+    fill_bf16(A,M,K,zf);
+    fill_bf16(B,K,N,zf);
+    memset(C,0,M*N*sizeof(float));
+
+    __tilecfg cfg={0};
+    cfg.palette_id=1; cfg.start_row=0;
+    cfg.rows[0]=M; cfg.colsb[0]=K*sizeof(uint16_t);
+    cfg.rows[1]=K; cfg.colsb[1]=N*sizeof(uint16_t);
+    cfg.rows[2]=M; cfg.colsb[2]=N*sizeof(float);
+    _tile_loadconfig(&cfg);
+
+    uint64_t sum=0; unsigned int aux;
+    for(int i=0;i<REPETITIONS;i++){
+        uint64_t s=__rdtscp(&aux);
+        _tile_zero(2);
+        _tile_loadd(0,A,K*sizeof(uint16_t));
+        _tile_loadd(1,B,N*sizeof(uint16_t));
+        _tile_dpbf16ps(2,0,1);
+        _tile_stored(2,C,N*sizeof(float));
+        uint64_t e=__rdtscp(&aux);
+        sum += e-s;
+    }
+    _tile_release();
+    free(A); free(B); free(C);
+    return sum/REPETITIONS;
+}
+
+// ------------------------
+// Main: automatic sweep
+// ------------------------
+int main() {
+    pin_thread_to_core(0);
+
+    int M=64, N=64, K=64;                  // tile size
+    float zero_fracs[] = {0.0,0.1,0.2,0.3,0.5,0.7,0.9,1.0};
+    int num_zf = sizeof(zero_fracs)/sizeof(zero_fracs[0]);
+
+    // Open CSV file
+    FILE *f = fopen("amx_zero_skip.csv","w");
+    if(!f) { perror("fopen"); return 1; }
+    fprintf(f,"Type,ZeroFraction,Cycles\n");
+
+    // Sweep INT8
+    for(int i=0;i<num_zf;i++){
+        float zf = zero_fracs[i];
+        uint64_t cycles = measure_int8(M,N,K,zf);
+        printf("INT8,%.1f, %lu cycles\n", zf, (unsigned long)cycles);
+        fprintf(f,"INT8,%.1f,%lu\n", zf, (unsigned long)cycles);
     }
 
-    fclose(fp);
-    free(A); free(B); free(C);
-    printf("\nResults written to amx_sparsity_results.csv\n");
+    // Sweep BF16
+    for(int i=0;i<num_zf;i++){
+        float zf = zero_fracs[i];
+        uint64_t cycles = measure_bf16(M,N,K,zf);
+        printf("BF16,%.1f, %lu cycles\n", zf, (unsigned long)cycles);
+        fprintf(f,"BF16,%.1f,%lu\n", zf, (unsigned long)cycles);
+    }
+
+    fclose(f);
     return 0;
 }
