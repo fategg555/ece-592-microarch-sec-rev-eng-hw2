@@ -3,8 +3,8 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
-#include <immintrin.h>    // AMX intrinsics
-#include <x86intrin.h>    // __rdtscp
+#include <immintrin.h>
+#include <x86intrin.h>
 #include <pthread.h>
 #include <sched.h>
 
@@ -18,6 +18,9 @@ typedef struct {
     uint8_t   rows[16];
 } __tilecfg;
 
+// ------------------------
+// Helpers
+// ------------------------
 static void pin_thread_to_core(int core_id) {
     cpu_set_t cs;
     CPU_ZERO(&cs);
@@ -43,6 +46,9 @@ static void fill_bf16(uint16_t *B, int R, int C, float zf) {
     }
 }
 
+// ------------------------
+// Measure functions
+// ------------------------
 static uint64_t measure_int8(int M,int N,int K,float zf){
     int8_t  *A=aligned_alloc(64,M*K);
     int8_t  *B=aligned_alloc(64,K*N);
@@ -105,27 +111,37 @@ static uint64_t measure_bf16(int M,int N,int K,float zf){
     return sum/REPETITIONS;
 }
 
-int main(int argc, char **argv) {
-    if(argc!=6){
-        fprintf(stderr,"Usage: %s <INT8|BF16> M N K zero_frac\n",argv[0]);
-        return 1;
-    }
-    char *type=argv[1];
-    int M=atoi(argv[2]), N=atoi(argv[3]), K=atoi(argv[4]);
-    float zf=strtof(argv[5],NULL);
-
+// ------------------------
+// Main: automatic sweep
+// ------------------------
+int main() {
     pin_thread_to_core(0);
-    uint64_t cycles=0;
 
-    if(strcmp(type,"INT8")==0){
-        cycles = measure_int8(M,N,K,zf);
-    } else if(strcmp(type,"BF16")==0){
-        cycles = measure_bf16(M,N,K,zf);
-    } else {
-        fprintf(stderr,"Unknown type '%s'\n",type);
-        return 1;
+    int M=64, N=64, K=64;                  // tile size
+    float zero_fracs[] = {0.0,0.1,0.2,0.3,0.5,0.7,0.9,1.0};
+    int num_zf = sizeof(zero_fracs)/sizeof(zero_fracs[0]);
+
+    // Open CSV file
+    FILE *f = fopen("amx_zero_skip.csv","w");
+    if(!f) { perror("fopen"); return 1; }
+    fprintf(f,"Type,ZeroFraction,Cycles\n");
+
+    // Sweep INT8
+    for(int i=0;i<num_zf;i++){
+        float zf = zero_fracs[i];
+        uint64_t cycles = measure_int8(M,N,K,zf);
+        printf("INT8,%.1f, %lu cycles\n", zf, (unsigned long)cycles);
+        fprintf(f,"INT8,%.1f,%lu\n", zf, (unsigned long)cycles);
     }
 
-    printf("%lu\n",(unsigned long)cycles);
+    // Sweep BF16
+    for(int i=0;i<num_zf;i++){
+        float zf = zero_fracs[i];
+        uint64_t cycles = measure_bf16(M,N,K,zf);
+        printf("BF16,%.1f, %lu cycles\n", zf, (unsigned long)cycles);
+        fprintf(f,"BF16,%.1f,%lu\n", zf, (unsigned long)cycles);
+    }
+
+    fclose(f);
     return 0;
 }
