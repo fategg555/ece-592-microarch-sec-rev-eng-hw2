@@ -9,11 +9,12 @@ column_name = 'access_times'
 
 # Load the data
 data = pd.read_csv(file_path)
-print(data)
-
+max_access = int(data[column_name].max())
+min_access = int(data[column_name].min())
 # Plot the histogram
-plt.hist(data[column_name].dropna(), bins=30, edgecolor='black')
-plt.title(f'Histogram of {column_name}')
+plt.hist(data[column_name].dropna(), bins=int((max_access - min_access)/10), edgecolor='black')
+plt.title(f'Frequency of Access Times for Page-Aligned Linked List')
 plt.xlabel(column_name)
 plt.ylabel('Frequency')
 plt.show()
+
