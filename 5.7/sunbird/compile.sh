@@ -1,1 +1,0 @@
-gcc -O0 -fno-tree-vectorize -g tlb_bench.c -o tlb_bench

@@ -1,4 +1,0 @@
-=== TLB Microbenchmark (debug) ===
-iterations=2000000
-4 KiB pages (16384 pages): avg cycles/access = 296
-2 MiB pages (512 pages): avg cycles/access = 278

@@ -29,7 +29,8 @@ struct page_block_t *create_block(int num_pages, uint64_t page_size, struct page
 
 void tlb_levels(FILE *log, int num_pages, uint64_t page_size)
 {
-    printf("=== %d pages @ size %ld ===\n", num_pages, page_size);
+    // printf("=== %d pages @ size %ld ===\n", num_pages, page_size);
+    printf("access_times\n");
     struct page_block_t *start = create_block(num_pages, page_size, NULL, 0);
     struct page_block_t **head = &start;
     struct page_block_t **prev = &start;
