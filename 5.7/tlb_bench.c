@@ -84,7 +84,7 @@ void test_tlb_levels()
     //     // tlb_levels(NULL, i, page_size);
     //     // fclose(log);
     // }
-     tlb_levels(NULL, 8192, FOUR_KB);
+     tlb_levels(NULL, 409, FOUR_KB);
 }
 
 int main(void)
