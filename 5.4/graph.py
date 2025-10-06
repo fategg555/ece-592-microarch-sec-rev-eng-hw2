@@ -16,7 +16,7 @@ def plot_csv(file_path):
 
         plt.figure(figsize=(8, 5))
         plt.plot(x, y, marker='o')
-        plt.title("Average Access Time Per Branch for N=8")
+        plt.title("Average Access Time Per Branch for N=4")
         plt.xlabel("Number of Branches")
         plt.ylabel("Average Access Time Per Branch")
         plt.grid(True)
