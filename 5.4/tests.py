@@ -11,7 +11,7 @@ def run_capacity_branch(branch):
 
     nop_ct = lambda x: x-2
 
-    ct = nop_ct(4) # really a PC difference between labels
+    ct = nop_ct(16) # really a PC difference between labels
     for i in range(ct):
         nops += "NOP "
 
